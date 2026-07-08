@@ -8,12 +8,13 @@ pipeline {
         }
         stage('Apagar') {
             steps {
-                sh 'docker-compose down'
+                // Probamos con la ruta completa o el alias de docker
+                sh 'docker compose down || docker-compose down'
             }
         }
         stage('Encender') {
             steps {
-                sh 'docker-compose up -d'
+                sh 'docker compose up -d || docker-compose up -d'
             }
         }
         stage('Verificar') {
