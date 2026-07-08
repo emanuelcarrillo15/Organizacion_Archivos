@@ -5,7 +5,7 @@ pipeline {
         // Definición de variables globales para el despliegue
         DOCKER_NETWORK = "red-wordpress"
         MYSQL_CONTAINER = "mysql_db"
-        WP_CONTAINER    = "wordpress_site"
+        WP_CONTAINER  = "wordpress_site"
     }
 
     stages {
@@ -32,7 +32,6 @@ pipeline {
         stage('Despliegue Base de Datos (MySQL)') {
             steps {
                 echo 'Levantando el contenedor de MySQL...'
-                // Se levanta MySQL con variables de entorno básicas y seguras para la práctica
                 sh """
                     docker run -d --name ${MYSQL_CONTAINER} \
                     --network ${DOCKER_NETWORK} \
@@ -50,11 +49,11 @@ pipeline {
         stage('Despliegue de Aplicación (WordPress)') {
             steps {
                 echo 'Levantando el contenedor de WordPress conectado a MySQL...'
-                // Se expone en el puerto 8080 de la máquina host hacia el puerto 80 nativo del contenedor
+                // Puerto cambiado a 8086 para evitar conflicto con tu puerto 8080
                 sh """
                     docker run -d --name ${WP_CONTAINER} \
                     --network ${DOCKER_NETWORK} \
-                    -p 8080:80 \
+                    -p 8086:80 \
                     -e WORDPRESS_DB_HOST=${MYSQL_CONTAINER}:3306 \
                     -e WORDPRESS_DB_USER=wp_user \
                     -e WORDPRESS_DB_PASSWORD=wp_password \
@@ -78,7 +77,7 @@ pipeline {
             echo 'Finalizando la ejecución del Pipeline.'
         }
         success {
-            echo 'Despliegue exitoso. WordPress está disponible en el puerto 8080.'
+            echo 'Despliegue exitoso. WordPress está disponible en el puerto 8086.'
         }
         failure {
             echo 'Hubo un error en el despliegue. Revisa los logs anteriores.'
