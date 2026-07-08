@@ -8,7 +8,7 @@ pipeline {
         }
         stage('Apagar') {
             steps {
-                sh 'docker-compose down' /
+                sh 'docker-compose down'
             }
         }
         stage('Encender') {
