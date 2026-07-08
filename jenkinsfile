@@ -1,0 +1,87 @@
+pipeline {
+    agent any
+
+    environment {
+        // Definición de variables globales para el despliegue
+        DOCKER_NETWORK = "red-wordpress"
+        MYSQL_CONTAINER = "mysql_db"
+        WP_CONTAINER    = "wordpress_site"
+    }
+
+    stages {
+        stage('Limpieza de Entorno') {
+            steps {
+                echo 'Removiendo contenedores o redes previas para evitar conflictos...'
+                script {
+                    // Detener y eliminar contenedores si existen
+                    sh "docker stop ${WP_CONTAINER} ${MYSQL_CONTAINER} || true"
+                    sh "docker rm ${WP_CONTAINER} ${MYSQL_CONTAINER} || true"
+                    // Eliminar la red si ya existía para crearla limpia
+                    sh "docker network rm ${DOCKER_NETWORK} || true"
+                }
+            }
+        }
+
+        stage('Configuración de Red') {
+            steps {
+                echo 'Creando la red dedicada de Docker...'
+                sh "docker network create ${DOCKER_NETWORK}"
+            }
+        }
+
+        stage('Despliegue Base de Datos (MySQL)') {
+            steps {
+                echo 'Levantando el contenedor de MySQL...'
+                // Se levanta MySQL con variables de entorno básicas y seguras para la práctica
+                sh """
+                    docker run -d --name ${MYSQL_CONTAINER} \
+                    --network ${DOCKER_NETWORK} \
+                    -e MYSQL_ROOT_PASSWORD=root_password \
+                    -e MYSQL_DATABASE=wordpress_db \
+                    -e MYSQL_USER=wp_user \
+                    -e MYSQL_PASSWORD=wp_password \
+                    mysql:8.0
+                """
+                echo 'Esperando que MySQL inicialice correctamente...'
+                sh "sleep 15"
+            }
+        }
+
+        stage('Despliegue de Aplicación (WordPress)') {
+            steps {
+                echo 'Levantando el contenedor de WordPress conectado a MySQL...'
+                // Se expone en el puerto 8080 de la máquina host hacia el puerto 80 nativo del contenedor
+                sh """
+                    docker run -d --name ${WP_CONTAINER} \
+                    --network ${DOCKER_NETWORK} \
+                    -p 8080:80 \
+                    -e WORDPRESS_DB_HOST=${MYSQL_CONTAINER}:3306 \
+                    -e WORDPRESS_DB_USER=wp_user \
+                    -e WORDPRESS_DB_PASSWORD=wp_password \
+                    -e WORDPRESS_DB_NAME=wordpress_db \
+                    wordpress:latest
+                """
+            }
+        }
+
+        stage('Verificación de Servicios') {
+            steps {
+                echo 'Validando el estado de los contenedores desplegados...'
+                sh "docker ps | grep -E '${MYSQL_CONTAINER}|${WP_CONTAINER}'"
+                echo '¡El despliegue automatizado se ha completado con éxito!'
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Finalizando la ejecución del Pipeline.'
+        }
+        success {
+            echo 'Despliegue exitoso. WordPress está disponible en el puerto 8080.'
+        }
+        failure {
+            echo 'Hubo un error en el despliegue. Revisa los logs anteriores.'
+        }
+    }
+}
