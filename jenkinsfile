@@ -1,86 +1,25 @@
 pipeline {
     agent any
-
-    environment {
-        // Definición de variables globales para el despliegue
-        DOCKER_NETWORK = "red-wordpress"
-        MYSQL_CONTAINER = "mysql_db"
-        WP_CONTAINER  = "wordpress_site"
-    }
-
     stages {
-        stage('Limpieza de Entorno') {
+        stage('Descargar') {
             steps {
-                echo 'Removiendo contenedores o redes previas para evitar conflictos...'
-                script {
-                    // Detener y eliminar contenedores si existen
-                    sh "docker stop ${WP_CONTAINER} ${MYSQL_CONTAINER} || true"
-                    sh "docker rm ${WP_CONTAINER} ${MYSQL_CONTAINER} || true"
-                    // Eliminar la red si ya existía para crearla limpia
-                    sh "docker network rm ${DOCKER_NETWORK} || true"
-                }
+                git branch: 'main', url: 'https://github.com/emanuelcarrillo15/Organizacion_Archivos.git'
             }
         }
-
-        stage('Configuración de Red') {
+        stage('Apagar') {
             steps {
-                echo 'Creando la red dedicada de Docker...'
-                sh "docker network create ${DOCKER_NETWORK}"
+                sh 'docker compose down'
             }
         }
-
-        stage('Despliegue Base de Datos (MySQL)') {
+        stage('Encender') {
             steps {
-                echo 'Levantando el contenedor de MySQL...'
-                sh """
-                    docker run -d --name ${MYSQL_CONTAINER} \
-                    --network ${DOCKER_NETWORK} \
-                    -e MYSQL_ROOT_PASSWORD=root_password \
-                    -e MYSQL_DATABASE=wordpress_db \
-                    -e MYSQL_USER=wp_user \
-                    -e MYSQL_PASSWORD=wp_password \
-                    mysql:8.0
-                """
-                echo 'Esperando que MySQL inicialice correctamente...'
-                sh "sleep 15"
+                sh 'docker compose up -d'
             }
         }
-
-        stage('Despliegue de Aplicación (WordPress)') {
+        stage('Verificar') {
             steps {
-                echo 'Levantando el contenedor de WordPress conectado a MySQL...'
-                // Puerto cambiado a 8086 para evitar conflicto con tu puerto 8080
-                sh """
-                    docker run -d --name ${WP_CONTAINER} \
-                    --network ${DOCKER_NETWORK} \
-                    -p 8086:80 \
-                    -e WORDPRESS_DB_HOST=${MYSQL_CONTAINER}:3306 \
-                    -e WORDPRESS_DB_USER=wp_user \
-                    -e WORDPRESS_DB_PASSWORD=wp_password \
-                    -e WORDPRESS_DB_NAME=wordpress_db \
-                    wordpress:latest
-                """
+                sh 'docker ps'
             }
-        }
-
-        stage('Verificación de Servicios') {
-            steps {
-                echo 'Validando el estado de los contenedores desplegados...'
-                sh "docker ps | grep -E '${MYSQL_CONTAINER}|${WP_CONTAINER}'"
-                echo '¡El despliegue automatizado se ha completado con éxito!'
-            }
-        }
-    }
-
-    post {
-        always {
-            echo 'Finalizando la ejecución del Pipeline.'
-        }
-        success {
-            echo 'Despliegue exitoso. WordPress está disponible en el puerto 8086.'
-        }
-        failure {
-            echo 'Hubo un error en el despliegue. Revisa los logs anteriores.'
         }
     }
 }
