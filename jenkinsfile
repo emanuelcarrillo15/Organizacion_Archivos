@@ -1,25 +1,56 @@
 pipeline {
     agent any
+    environment {
+        DOCKER_NETWORK = "red-wordpress"
+        MYSQL_CONTAINER = "mysql_db"
+        WP_CONTAINER  = "wordpress_site"
+    }
     stages {
-        stage('Descargar') {
+        stage('Limpieza') {
             steps {
-                git branch: 'main', url: 'https://github.com/emanuelcarrillo15/Organizacion_Archivos.git'
+                script {
+                    sh "docker stop ${WP_CONTAINER} ${MYSQL_CONTAINER} || true"
+                    sh "docker rm ${WP_CONTAINER} ${MYSQL_CONTAINER} || true"
+                    sh "docker network rm ${DOCKER_NETWORK} || true"
+                }
             }
         }
-        stage('Apagar') {
+        stage('Red') {
             steps {
-                // Probamos con la ruta completa o el alias de docker
-                sh 'docker compose down || docker-compose down'
+                sh "docker network create ${DOCKER_NETWORK}"
             }
         }
-        stage('Encender') {
+        stage('Base de Datos') {
             steps {
-                sh 'docker compose up -d || docker-compose up -d'
+                sh """
+                    docker run -d --name ${MYSQL_CONTAINER} \
+                    --network ${DOCKER_NETWORK} \
+                    -e MYSQL_ROOT_PASSWORD=UPI.2026 \
+                    -e MYSQL_DATABASE=wordpress_db \
+                    -e MYSQL_USER=wp_user \
+                    -e MYSQL_PASSWORD=UPI.2026 \
+                    mysql:8.0
+                """
+                sh "sleep 15"
             }
         }
-        stage('Verificar') {
+        stage('WordPress') {
             steps {
-                sh 'docker ps'
+                sh """
+                    docker run -d --name ${WP_CONTAINER} \
+                    --network ${DOCKER_NETWORK} \
+                    -p 8086:80 \
+                    -e WORDPRESS_DB_HOST=${MYSQL_CONTAINER}:3306 \
+                    -e WORDPRESS_DB_USER=wp_user \
+                    -e WORDPRESS_DB_PASSWORD=UPI.2026 \
+                    -e WORDPRESS_DB_NAME=wordpress_db \
+                    wordpress:latest
+                """
+            }
+        }
+        stage('Verificación') {
+            steps {
+                sh "docker ps"
             }
         }
     }
